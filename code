@@ -1,0 +1,163 @@
+
+import socket
+import wx
+import os
+import wolframalpha
+import requests
+import webbrowser
+import imaplib
+import win32com.client as wincl
+import speech_recognition as sr
+import winshell
+import json
+import ctypes
+from bs4 import BeautifulSoup
+from urllib.request import urlopen
+speak = wincl.Dispatch("SAPI.SpVoice")
+
+
+headers = {
+    'user-agent': 'Mozilla/56.0.1 '}
+class MyFrame(wx.Frame):
+    def __init__(self):
+        wx.Frame.__init__(self, None,
+                          pos=wx.DefaultPosition, size=wx.Size(450, 100),
+                          style=wx.MINIMIZE_BOX | wx.SYSTEM_MENU | wx.CAPTION |
+                          wx.CLOSE_BOX | wx.CLIP_CHILDREN,
+                          title="BaBa")
+        panel = wx.Panel(self)
+
+        my_sizer = wx.BoxSizer(wx.VERTICAL)
+        lbl = wx.StaticText(panel,
+                            label="Sir, What can i help you with")
+        my_sizer.Add(lbl, 0, wx.ALL, 5)
+        self.txt = wx.TextCtrl(panel, style=wx.TE_PROCESS_ENTER,
+                               size=(400, 30))
+        self.txt.SetFocus()
+        self.txt.Bind(wx.EVT_TEXT_ENTER, self.OnEnter)
+        my_sizer.Add(self.txt, 0, wx.ALL, 5)
+        panel.SetSizer(my_sizer)
+        self.Show()
+        speak.Speak('''Welcome Sir, Baba at your service''')
+
+    def OnEnter(self, event):
+        put = self.txt.GetValue()
+        put = put.lower()
+        link = put.split()
+        if put == '':
+            r = sr.Recognizer()
+            with sr.Microphone() as src:
+                audio = r.listen(src)
+            try:
+                put = r.recognize_google(audio)
+                put = put.lower()
+                link = put.split()
+                self.txt.SetValue(put)
+
+            except sr.UnknownValueError:
+                print("Google Speech Recognition could not understand audio")
+            except sr.RequestError as e:
+                print("Could not request results from Google STT; {0}"
+                      .format(e))
+            except:
+                print("Unknown exception occurred!")
+
+        if put.startswith('open '):
+            try:
+                speak.Speak("opening " + link[1])
+                webbrowser.open('https://www.' + link[1] + '.com')
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('play '):
+            try:
+                path1="C:\\Users\\dementor\\Desktop\\songs\\eng\\"
+                speak.Speak("playing " + link[1])
+                for filename in os.listdir(path1):
+                    if filename.startswith(link[1].title()):
+                        file=path1+filename
+                        os.startfile(file)
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('watch '):
+            try:
+
+                link = '+'.join(link[1:])
+                say = link.replace('+', ' ')
+                url = 'https://www.youtube.com/results?search_query=' + link
+                source_code = requests.get(url, headers=headers, timeout=15)
+                plain_text = source_code.text
+                soup = BeautifulSoup(plain_text, "html.parser")
+                songs = soup.findAll('div', {'class': 'yt-lockup-video'})
+                song = songs[0].contents[0].contents[0].contents[0]
+                hit = song['href']
+                speak.Speak("playing " + say)
+                webbrowser.open('https://www.youtube.com' + hit)
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('headlines '):
+            try:
+                jsonObj = urlopen(
+                    '''https://newsapi.org/v1/articles?source=the-times-of-india&sortBy=top&apiKey=your id''')
+                data = json.load(jsonObj)
+                i = 1
+                speak.Speak('here are some top news from the times of india')
+                print('''             ===============TIMES OF INDIA============'''
+                      + '\n')
+                for item in data['articles']:
+                    print(str(i) + '. ' + item['title'] + '\n')
+                    print(item['description'] + '\n')
+                    i += 1
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('mail '):
+            try:
+                socket.getaddrinfo('localhost', 8080)
+                def read(username='your id', password='your password', sender_of_interest=None):
+                    imap = imaplib.IMAP4_SSL("imap.gmail.com", 993)
+                    imap.login(username, password)
+                    imap.select('INBOX')
+                    status, response = imap.search(None, 'INBOX', '(UNSEEN)')
+                    unread_msg_nums = response[0].split()
+                    print(len(unread_msg_nums))
+                    status, response = imap.search(None, '(UNSEEN)', '(FROM "%s")' % sender_of_interest)
+                    unread_msg_nums = response[0].split()
+                    da = []
+                    for e_id in unread_msg_nums:
+                        _, response = imap.fetch(e_id, '(UID BODY[TEXT])')
+                        da.append(response[0][1])
+                    print(da)
+                read()
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('search '):
+            try:
+                link = '+'.join(link[1:])
+                say = link.replace('+', ' ')
+                speak.Speak("searching on google for " + say)
+                webbrowser.open('https://www.google.co.in/search?q=' + link)
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('lock '):
+            try:
+                speak.Speak("locking the device")
+                ctypes.windll.user32.LockWorkStation()
+            except Exception as e:
+                print(str(e))
+        elif put.startswith('empty bin'):
+            try:
+                winshell.recycle_bin().empty(confirm=False,
+                                             show_progress=False, sound=True)
+                speak.Speak("Recycle Bin Empty!!")
+            except Exception as e:
+                print(str(e))
+        else:
+                client = wolframalpha.Client('your id')
+                res = client.query(put)
+                ans = next(res.results).text
+                print(ans)
+                speak.Speak(ans)
+
+if __name__ == "__main__":
+    app = wx.App(True)
+    frame = MyFrame()
+    app.MainLoop()
